@@ -1,14 +1,21 @@
+import math
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 from typing import List
-from concurrent.futures import ProcessPoolExecutor
-import math
+
 import pypdfium2 as pdfium
 
 from pdftext.inference import inference
 from pdftext.model import get_model
 from pdftext.pdf.chars import get_pdfium_chars
 from pdftext.pdf.utils import unnormalize_bbox
-from pdftext.postprocessing import merge_text, sort_blocks, postprocess_text, handle_hyphens
+from pdftext.postprocessing import (
+    handle_hyphens,
+    merge_text,
+    postprocess_text,
+    sort_blocks,
+)
 from pdftext.settings import settings
 
 
@@ -18,7 +25,7 @@ def _load_pdf(pdf, flatten_pdf):
     # Must be called on the parent pdf, before the page was retrieved
     if flatten_pdf:
         pdf.init_forms()
-    
+
     return pdf
 
 
@@ -42,7 +49,9 @@ def _get_pages(pdf_path, page_range=None, flatten_pdf=False, workers=None):
         page_range = range(len(pdf_doc))
 
     if workers is not None:
-        workers = min(workers, len(page_range) // settings.WORKER_PAGE_THRESHOLD) # It's inefficient to have too many workers, since we batch in inference
+        workers = min(
+            workers, len(page_range) // settings.WORKER_PAGE_THRESHOLD
+        )  # It's inefficient to have too many workers, since we batch in inference
 
     if workers is None or workers <= 1:
         model = get_model()
@@ -52,22 +61,53 @@ def _get_pages(pdf_path, page_range=None, flatten_pdf=False, workers=None):
     page_range = list(page_range)
 
     pages_per_worker = math.ceil(len(page_range) / workers)
-    page_range_chunks = [page_range[i * pages_per_worker:(i + 1) * pages_per_worker] for i in range(workers)]
+    page_range_chunks = [
+        page_range[i * pages_per_worker : (i + 1) * pages_per_worker]
+        for i in range(workers)
+    ]
 
-    with ProcessPoolExecutor(max_workers=workers, initializer=worker_init, initargs=(pdf_path, flatten_pdf)) as executor:
-        pages = list(executor.map(_get_page_range, page_range_chunks, repeat(flatten_pdf)))
+    with ProcessPoolExecutor(
+        max_workers=workers,
+        initializer=worker_init,
+        initargs=(pdf_path, flatten_pdf),
+        mp_context=mp.get_context("fork"),
+    ) as executor:
+        pages = list(
+            executor.map(_get_page_range, page_range_chunks, repeat(flatten_pdf))
+        )
 
     ordered_pages = [page for sublist in pages for page in sublist]
 
     return ordered_pages
 
 
-def plain_text_output(pdf_path, sort=False, hyphens=False, page_range=None, flatten_pdf=False, workers=None) -> str:
-    text = paginated_plain_text_output(pdf_path, sort=sort, hyphens=hyphens, page_range=page_range, workers=workers, flatten_pdf=flatten_pdf)
+def plain_text_output(
+    pdf_path,
+    sort=False,
+    hyphens=False,
+    page_range=None,
+    flatten_pdf=False,
+    workers=None,
+) -> str:
+    text = paginated_plain_text_output(
+        pdf_path,
+        sort=sort,
+        hyphens=hyphens,
+        page_range=page_range,
+        workers=workers,
+        flatten_pdf=flatten_pdf,
+    )
     return "\n".join(text)
 
 
-def paginated_plain_text_output(pdf_path, sort=False, hyphens=False, page_range=None, flatten_pdf=False, workers=None) -> List[str]:
+def paginated_plain_text_output(
+    pdf_path,
+    sort=False,
+    hyphens=False,
+    page_range=None,
+    flatten_pdf=False,
+    workers=None,
+) -> List[str]:
     pages = _get_pages(pdf_path, page_range, workers=workers, flatten_pdf=flatten_pdf)
     text = []
     for page in pages:
@@ -85,7 +125,14 @@ def _process_span(span, page_width, page_height, keep_chars):
             char["bbox"] = unnormalize_bbox(char["bbox"], page_width, page_height)
 
 
-def dictionary_output(pdf_path, sort=False, page_range=None, keep_chars=False, flatten_pdf=False, workers=None):
+def dictionary_output(
+    pdf_path,
+    sort=False,
+    page_range=None,
+    keep_chars=False,
+    flatten_pdf=False,
+    workers=None,
+):
     pages = _get_pages(pdf_path, page_range, workers=workers, flatten_pdf=flatten_pdf)
     for page in pages:
         page_width, page_height = page["width"], page["height"]

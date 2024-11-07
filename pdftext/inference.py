@@ -1,7 +1,8 @@
 import numpy as np
 
-from pdftext.pdf.utils import LINE_BREAKS, TABS, SPACES
+from pdftext.pdf.utils import LINE_BREAKS, SPACES, TABS
 from pdftext.settings import settings
+
 
 def update_current(current, new_char):
     bbox = new_char["bbox"]
@@ -37,11 +38,13 @@ def create_training_row(char_info, prev_char, currblock, currline):
 
     char_font = char_info["font"]
     prev_font = prev_char["font"]
-    font_match = (char_font["name"] == prev_font["name"] and
-                  char_font["size"] == prev_font["size"] and
-                  char_font["weight"] == prev_font["weight"] and
-                  char_font["flags"] == prev_font["flags"] and
-                  char_info["rotation"] == prev_char["rotation"])
+    font_match = (
+        char_font["name"] == prev_font["name"]
+        and char_font["size"] == prev_font["size"]
+        and char_font["weight"] == prev_font["weight"]
+        and char_font["flags"] == prev_font["flags"]
+        and char_info["rotation"] == prev_char["rotation"]
+    )
 
     is_space = char in SPACES or char in TABS
 
@@ -64,7 +67,7 @@ def create_training_row(char_info, prev_char, currblock, currline):
         x_gap,
         char_x2 - prev_x1,
         y_gap,
-        char_y2 - prev_y1
+        char_y2 - prev_y1,
     ]
 
 
@@ -80,14 +83,16 @@ def update_span(line, span):
             max_x = max(max_x, bbox[2])
             max_y = max(max_y, bbox[3])
 
-        span.update({
-            "font": first_char["font"],
-            "rotation": first_char["rotation"],
-            "bbox": [min_x, min_y, max_x, max_y],
-            "text": "".join(char["char"] for char in span["chars"]),
-            "char_start_idx": first_char["char_idx"],
-            "char_end_idx": span["chars"][-1]["char_idx"]
-        })
+        span.update(
+            {
+                "font": first_char["font"],
+                "rotation": first_char["rotation"],
+                "bbox": [min_x, min_y, max_x, max_y],
+                "text": "".join(char["char"] for char in span["chars"]),
+                "char_start_idx": first_char["char_idx"],
+                "char_end_idx": span["chars"][-1]["char_idx"],
+            }
+        )
 
         # Remove unneeded keys from the characters
         char_keys = list(first_char.keys())
@@ -112,7 +117,9 @@ def update_block(blocks, block):
     return block
 
 
-def get_dynamic_line_thresh(text_chars, rotation, default_thresh=.05, min_thresh=.0025, min_lines=5):
+def get_dynamic_line_thresh(
+    text_chars, rotation, default_thresh=0.05, min_thresh=0.0025, min_lines=5
+):
     line_dists = []
     prev_char = None
     for i, char_info in enumerate(text_chars["chars"][1:]):
@@ -132,12 +139,18 @@ def get_dynamic_line_thresh(text_chars, rotation, default_thresh=.05, min_thresh
         if line_dist > min_thresh:
             line_dists.append(line_dist)
         prev_char = char_info
-    line_gap_thresh = np.percentile(line_dists, 50) if len(line_dists) > min_lines else default_thresh
+    line_gap_thresh = (
+        np.percentile(line_dists, 50) if len(line_dists) > min_lines else default_thresh
+    )
     return line_gap_thresh
 
 
 def is_same_line(char_bbox, line_box, space_thresh, rotation):
-    line_center_x, line_center_y = (line_box[0] + line_box[2]) / 2, (line_box[1] + line_box[3]) / 2
+    line_center_x, line_center_y = (
+        (line_box[0] + line_box[2]) / 2,
+        (line_box[1] + line_box[3]) / 2,
+    )
+
     def normalized_diff(a, b, mult=1, use_abs=True):
         func = abs if use_abs else lambda x: x
         return func(a - b) < space_thresh * mult
@@ -149,6 +162,7 @@ def is_same_line(char_bbox, line_box, space_thresh, rotation):
     else:  # 0 or default case
         char_center_y = (char_bbox[1] + char_bbox[3]) / 2
         return normalized_diff(char_center_y, line_center_y)
+
 
 def infer_single_page(text_chars, block_threshold=settings.BLOCK_THRESHOLD):
     prev_char = None
@@ -169,14 +183,14 @@ def infer_single_page(text_chars, block_threshold=settings.BLOCK_THRESHOLD):
     line_thresh = get_dynamic_line_thresh(text_chars, rotation)
 
     for char_info in text_chars["chars"]:
-        font = char_info['font']
+        font = char_info["font"]
         font_info = f"{font['name']}_{font['size']}_{font['weight']}_{font['flags']}_{char_info['rotation']}"
         if prev_char:
             training_row = create_training_row(char_info, prev_char, block, line)
 
             prediction_probs = yield training_row
             # First item is probability of same line/block, second is probability of new line, third is probability of new block
-            if prediction_probs[0] >= .5:
+            if prediction_probs[0] >= 0.5:
                 # Ensure we update spans properly for font info when predicting no new line
                 if prev_font_info != font_info:
                     span = update_span(line, span)
@@ -184,10 +198,9 @@ def infer_single_page(text_chars, block_threshold=settings.BLOCK_THRESHOLD):
                 span = update_span(line, span)
                 line = update_line(block, line)
                 block = update_block(blocks, block)
-            elif (
-                    prev_char["char"] in LINE_BREAKS or
-                    not is_same_line(char_info["bbox"], line["bbox"], line_thresh, rotation)
-            ): # Look for newline character as a forcing signal for a new line
+            elif prev_char["char"] in LINE_BREAKS or not is_same_line(
+                char_info["bbox"], line["bbox"], line_thresh, rotation
+            ):  # Look for newline character as a forcing signal for a new line
                 span = update_span(line, span)
                 line = update_line(block, line)
             elif prev_font_info != font_info:

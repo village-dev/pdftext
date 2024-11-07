@@ -1,10 +1,10 @@
-import json
 import argparse
+import json
 from statistics import mean
 
 
 def verify_scores(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         data = json.load(file)
 
     scores = data["alignments"]["pdftext"]

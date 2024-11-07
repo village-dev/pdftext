@@ -1,7 +1,7 @@
-from typing import List, Dict
 import unicodedata
+from typing import Dict, List
 
-from pdftext.pdf.utils import SPACES, LINE_BREAKS, TABS, WHITESPACE_CHARS
+from pdftext.pdf.utils import LINE_BREAKS, SPACES, TABS, WHITESPACE_CHARS
 
 LIGATURES = {
     "ﬀ": "ff",
@@ -63,7 +63,15 @@ def replace_special_chars(text: str) -> str:
 
 
 def replace_control_chars(text: str) -> str:
-    return "".join(char for char in text if (unicodedata.category(char)[0] != "C" or char == HYPHEN_CHAR or char in WHITESPACE_CHARS))
+    return "".join(
+        char
+        for char in text
+        if (
+            unicodedata.category(char)[0] != "C"
+            or char == HYPHEN_CHAR
+            or char in WHITESPACE_CHARS
+        )
+    )
 
 
 def replace_ligatures(text: str) -> str:
