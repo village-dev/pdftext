@@ -1,44 +1,33 @@
-[project]
+[tool.poetry]
 name = "pdftext"
 version = "0.3.18"
 description = "Extract structured text from pdfs quickly"
-authors = [{ name = "Vik Paruchuri", email = "vik.paruchuri@gmail.com" }]
-license = { text = "Apache-2.0" }
+authors = ["Vik Paruchuri <vik.paruchuri@gmail.com>"]
+license = "Apache-2.0"
 readme = "README.md"
-keywords = ["pdf", "text", "extraction"]
-requires-python = ">=3.10"
-dependencies = [
-    "pypdfium2>=4.29.0",
-    "pydantic>=2.7.1",
-    "pydantic-settings>=2.2.1",
-    "onnxruntime>=1.19.2",
-]
-
-
-[project.urls]
 repository = "https://github.com/VikParuchuri/pdftext"
+keywords = ["pdf", "text", "extraction"]
+packages = [{ include = "pdftext" }]
+include = ["extract_text.py", "models/dt.joblib", "models/dt.onnx"]
 
-[project.scripts]
-pdftext = "extract_text:main"
+[tool.poetry.dependencies]
+python = "^3.10"
+pypdfium2 = "^4.29.0"
+pydantic = "^2.7.1"
+pydantic-settings = "^2.2.1"
+onnxruntime = "^1.19.2"
+
+[tool.poetry.group.dev.dependencies]
+pymupdf = "^1.24.2"
+datasets = "^2.19.0"
+pdfplumber = "^0.11.0"
+pillow = "^10.3.0"
+rapidfuzz = "^3.8.1"
+tabulate = "^0.9.0"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
-[tool.hatch.build.targets.wheel]
-packages = ["pdftext"]
-
-[dependency-groups]
-dev = [
-    "pymupdf>=1.24.2",
-    "datasets>=2.19.0",
-    "pdfplumber>=0.11.0",
-    "pillow>=10.3.0",
-    "rapidfuzz>=3.8.1",
-    "tabulate>=0.9.0",
-    "pyright>=1.1.388",
-    "ruff>=0.7.2",
-]
-
-[tool.hatch.build]
-artifacts = ["extract_text.py", "models/dt.joblib", "models/dt.onnx"]
+[tool.poetry.scripts]
+pdftext = "extract_text:main"
